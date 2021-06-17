@@ -59,6 +59,7 @@ class SortTracker(BaseTracker):
     @property
     def confirmed_ids(self):
         """Confirmed ids in the tracker."""
+        # 判断track是否已被确认
         ids = [id for id, track in self.tracks.items() if not track.tentative]
         return ids
 
@@ -76,6 +77,7 @@ class SortTracker(BaseTracker):
         """Update a track."""
         super().update_track(id, obj)
         if self.tracks[id].tentative:
+            # 一个tentative的tarck，连续击中num_tentative帧，则转换成comfired状态
             if len(self.tracks[id]['bboxes']) >= self.num_tentatives:
                 self.tracks[id].tentative = False
         bbox = self.xyxy2xyah(self.tracks[id].bboxes[-1])  # size = (1, 4)
@@ -158,21 +160,27 @@ class SortTracker(BaseTracker):
                 self.tracks, costs = model.motion.track(
                     self.tracks, self.xyxy2xyah(bboxes))
 
+            # 对已确认状态的追踪器进行reid级联匹配
             active_ids = self.confirmed_ids
             if self.with_reid:
+                # 获得当前帧的feature embedding
                 embeds = model.reid.simple_test(
                     self.crop_imgs(reid_img, img_metas, bboxes[:, :4].clone(),
                                    rescale))
                 # reid
+                # 有活跃的track
                 if len(active_ids) > 0:
                     track_embeds = self.get(
                         'embeds',
                         active_ids,
                         self.reid.get('num_samples', None),
                         behavior='mean')
+                    # 计算距离矩阵 raw=track col=det
+                    # 欧氏距离?
                     reid_dists = torch.cdist(track_embeds,
                                              embeds).cpu().numpy()
 
+                    # 获得活跃track在所有track中的位置索引
                     valid_inds = [list(self.ids).index(_) for _ in active_ids]
                     reid_dists[~np.isfinite(costs[valid_inds, :])] = np.nan
 
@@ -181,12 +189,16 @@ class SortTracker(BaseTracker):
                         dist = reid_dists[r, c]
                         if not np.isfinite(dist):
                             continue
-                        if dist <= self.reid['match_score_thr']:
-                            ids[c] = active_ids[r]
 
+                        if dist <= self.reid['match_score_thr']:
+                            # 第c个det结果对应第r个track
+                            ids[c] = active_ids[r]
+                ###########################################################
+            # 未级联上的track和未确认状态的track与未级联上的det做IOU匹配
+            # self.ids当前所有的track
             active_ids = [
                 id for id in self.ids if id not in ids
-                and self.tracks[id].frame_ids[-1] == frame_id - 1
+                # and self.tracks[id].frame_ids[-1] == frame_id - 1
             ]
             if len(active_ids) > 0:
                 active_dets = torch.nonzero(ids == -1).squeeze(1)
@@ -214,4 +226,5 @@ class SortTracker(BaseTracker):
             labels=labels,
             embeds=embeds if self.with_reid else None,
             frame_ids=frame_id)
+        # 返回检测bboxes，分类labels，
         return bboxes, labels, ids

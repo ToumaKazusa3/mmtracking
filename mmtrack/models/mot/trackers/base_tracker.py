@@ -80,11 +80,14 @@ class BaseTracker(metaclass=ABCMeta):
 
         for obj in zip(*kwargs.values()):
             id = int(obj[id_indice])
+            # 匹配上的track
             if id in self.tracks:
                 self.update_track(id, obj)
+            # 没有匹配上的det，初始化一个新的track
             else:
                 self.init_track(id, obj)
 
+        # 没有匹配上的track，判断是否失活
         self.pop_invalid_tracks(frame_id)
 
     def pop_invalid_tracks(self, frame_id):
