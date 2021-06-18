@@ -6,6 +6,7 @@ from motmetrics.lap import linear_sum_assignment
 from mmtrack.core import imrenormalize
 from mmtrack.models import TRACKERS
 from .base_tracker import BaseTracker
+from mmtrack.core.track import compute_distance_matrix
 
 
 @TRACKERS.register_module()
@@ -37,11 +38,13 @@ class SortTracker(BaseTracker):
                      num_samples=10,
                      img_scale=(256, 128),
                      img_norm_cfg=None,
+                     metric='cosine',
                      match_score_thr=2.0),
                  match_iou_thr=0.7,
                  num_tentatives=3,
                  **kwargs):
         super().__init__(**kwargs)
+        # 只有bbox中score＞self.obj_score_thr才保留
         self.obj_score_thr = obj_score_thr
         self.reid = reid
         self.match_iou_thr = match_iou_thr
@@ -176,12 +179,15 @@ class SortTracker(BaseTracker):
                         self.reid.get('num_samples', None),
                         behavior='mean')
                     # 计算距离矩阵 raw=track col=det
-                    # 欧氏距离?
-                    reid_dists = torch.cdist(track_embeds,
-                                             embeds).cpu().numpy()
+                    # 欧氏距离,deepsort中为余弦距离
+                    reid_dists = compute_distance_matrix(track_embeds,
+                                                         embeds, metric=self.reid['metric']).cpu().numpy()
+                    # reid_dists = torch.cdist(track_embeds,
+                    #                          embeds).cpu().numpy()
 
                     # 获得活跃track在所有track中的位置索引
                     valid_inds = [list(self.ids).index(_) for _ in active_ids]
+                    # 如果cost矩阵中元素为nan那么reid_dists也应该为nan
                     reid_dists[~np.isfinite(costs[valid_inds, :])] = np.nan
 
                     row, col = linear_sum_assignment(reid_dists)
