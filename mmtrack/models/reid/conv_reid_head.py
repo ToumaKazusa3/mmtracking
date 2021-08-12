@@ -1,16 +1,17 @@
 import math
 
 import torch
-import torch.functional as F
 import torch.nn as nn
-from mmcls.models.builder import HEADS
+import torch.nn.functional as F
 from mmcls.models.heads.base_head import BaseHead
 from mmcv.cnn import normal_init
 from mmdet.models.builder import build_loss
 from mmdet.models.utils.gaussian_target import transpose_and_gather_feat
 
+from mmtrack.models.builder import REID
 
-@HEADS.register_module()
+
+@REID.register_module()
 class ConvReIDHead(BaseHead):
     """Conv head for re-identification."""
 
@@ -45,7 +46,7 @@ class ConvReIDHead(BaseHead):
 
     def _build_classifier(self):
         """Build classifier for reid branch."""
-        classifier = nn.Linear(self.out_channels, self.num_classes)
+        classifier = nn.Linear(self.out_channel, self.num_classes)
         return classifier
 
     def init_weights(self):
@@ -64,6 +65,8 @@ class ConvReIDHead(BaseHead):
         height_ratio = float(feat_h / img_h)
 
         ind = gt_bboxes[-1].new_zeros([bs, self.max_objs])
+        ind = ind.long()
+        reg_mask = torch.zeros_like(ind)
         for batch_id in range(bs):
             gt_bbox = gt_bboxes[batch_id]
             center_x = (gt_bbox[:, [0]] + gt_bbox[:, [2]]) * width_ratio / 2
@@ -73,22 +76,27 @@ class ConvReIDHead(BaseHead):
             for j, ct in enumerate(gt_centers):
                 ctx_int, cty_int = ct.int()
                 ind[batch_id][j] = cty_int * feat_w + ctx_int
+                reg_mask[batch_id][j] = 1
 
-        return ind
+        return ind, reg_mask
 
     def simple_test(self, x, batch_index):
         """Test without augmentation."""
+        x = self.reid_head(x)
         x = F.normalize(x, dim=1)
         id_feats = transpose_and_gather_feat(x, batch_index)
         return id_feats
 
     def forward_train(self, x, img_metas, gt_bboxes, gt_labels, **kwargs):
         """Model forward."""
-        batch_index = self.get_gt_ind(gt_bboxes, x.shape,
-                                      img_metas[0]['pad_shape'])
+        batch_index, reg_mask = self.get_gt_ind(gt_bboxes, x.shape,
+                                                img_metas[0]['pad_shape'])
+        x = self.reid_head(x)
         id_head = transpose_and_gather_feat(x, batch_index)
+        id_head = id_head[reg_mask > 0].contiguous()
         id_head = self.emb_scale * F.normalize(id_head)
         id_output = self.classifier(id_head).contiguous()
+        gt_labels = torch.cat(gt_labels)
         id_loss = self.loss(id_output, gt_labels)
-
+        id_loss = {'loss_id': id_loss}
         return id_loss

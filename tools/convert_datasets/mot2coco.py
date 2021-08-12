@@ -129,6 +129,11 @@ def main():
             det_file = osp.join(args.output, f'{subset}_detections.pkl')
             detections = dict(bbox_results=dict())
         video_names = os.listdir(in_folder)
+        if 'MOT17' in in_folder:
+            video_names = [
+                video_name for video_name in video_names
+                if 'FRCNN' in video_name
+            ]
         for video_name in tqdm(video_names):
             # basic params
             parse_gt = 'test' not in subset

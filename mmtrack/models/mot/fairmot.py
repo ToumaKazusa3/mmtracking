@@ -1,7 +1,9 @@
+import torch
 from mmdet.core import bbox2result
 from mmdet.models import build_detector
 from mmdet.models.utils.gaussian_target import (get_local_maximum,
                                                 get_topk_from_heatmap)
+from torch import nn
 
 from mmtrack.core import track2result
 from ..builder import MODELS, build_motion, build_reid, build_tracker
@@ -34,6 +36,9 @@ class FairMOT(BaseMultiObjectTracker):
         if tracker is not None:
             self.tracker = build_tracker(tracker)
 
+        self.s_det = nn.Parameter(-1.85 * torch.ones(1))
+        self.s_id = nn.Parameter(-1.05 * torch.ones(1))
+
         self.init_weights(pretrains)
 
     def init_weights(self, pretrain):
@@ -58,19 +63,26 @@ class FairMOT(BaseMultiObjectTracker):
             center_heatmap_pred, k=k)
         return batch_index
 
-    def forward_train(self, img, img_metas, gt_bboxes, gt_det_labels,
-                      gt_reid_labels):
+    def forward_train(self, img, img_metas, gt_bboxes, gt_labels,
+                      gt_instance_ids):
         """Forward function during training."""
         x = self.detector.extract_feat(img)
 
         losses = dict()
-        det_loss = self.detector.head.forward_train(x, img_metas, gt_bboxes,
-                                                    gt_det_labels)
+        det_loss = self.detector.bbox_head.forward_train(
+            x, img_metas, gt_bboxes, gt_labels)
+        for key in det_loss:
+            det_loss[key] = torch.exp(-self.s_det) * det_loss[key] * 0.5
         losses.update(det_loss)
 
-        reid_loss = self.reid.head.forward_train(x, img_metas, gt_bboxes,
-                                                 gt_reid_labels)
+        reid_loss = self.reid.forward_train(x[0], img_metas, gt_bboxes,
+                                            gt_instance_ids)
+        for key in reid_loss:
+            reid_loss[key] = torch.exp(-self.s_id) * reid_loss[key] * 0.5
         losses.update(reid_loss)
+
+        loss = {'loss_parm': (self.s_det + self.s_id) * 0.5}
+        losses.update(loss)
 
         return losses
 
@@ -97,6 +109,9 @@ class FairMOT(BaseMultiObjectTracker):
         Returns:
             dict[str : list(ndarray)]: The tracking results.
         """
+        for img_meta in img_metas:
+            img_meta['batch_input_shape'] = tuple(img.size()[-2:])
+
         frame_id = img_metas[0].get('frame_id', -1)
         if frame_id == 0:
             self.tracker.reset()
@@ -136,7 +151,7 @@ class FairMOT(BaseMultiObjectTracker):
             img=img,
             img_metas=img_metas,
             model=self,
-            feats=x,
+            feats=x[0],
             batch_index=batch_index,
             bboxes=det_bboxes,
             labels=det_labels,

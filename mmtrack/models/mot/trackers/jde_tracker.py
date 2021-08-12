@@ -132,7 +132,7 @@ class JDETracker(BaseTracker):
         valid_inds = bboxes[:, -1] > self.obj_score_thr
         bboxes = bboxes[valid_inds]
         labels = labels[valid_inds]
-        batch_index = batch_index[valid_inds]
+        batch_index = batch_index[:, valid_inds]
 
         if self.empty or bboxes.size(0) == 0:
             num_new_tracks = bboxes.size(0)
@@ -142,7 +142,7 @@ class JDETracker(BaseTracker):
                 dtype=torch.long)
             self.num_tracks += num_new_tracks
             if self.with_reid:
-                embeds = model.reid.head.simple_test(feats, batch_index)
+                embeds = model.reid.simple_test(feats, batch_index).squeeze(0)
         else:
             ids = torch.full((bboxes.size(0), ), -1, dtype=torch.long)
 
@@ -153,7 +153,7 @@ class JDETracker(BaseTracker):
 
             active_ids = self.confirmed_ids
             if self.with_reid:
-                embeds = model.reid.head.simple_test(feats, batch_index)
+                embeds = model.reid.simple_test(feats, batch_index).squeeze(0)
                 # reid
                 if len(active_ids) > 0:
                     track_embeds = self.get(

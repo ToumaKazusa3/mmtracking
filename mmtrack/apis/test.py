@@ -41,12 +41,14 @@ def single_gpu_test(model,
     prev_img_meta = None
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
+        if i == 400:
+            break
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, **data)
         for k, v in result.items():
             results[k].append(v)
 
-        batch_size = data['img'][0].size(0)
+        batch_size = data['img'][0].data[0].size(0)
         if show or out_dir:
             assert batch_size == 1, 'Only support batch_size=1 when testing.'
             img_tensor = data['img'][0]

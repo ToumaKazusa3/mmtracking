@@ -89,6 +89,48 @@ class SeqLoadAnnotations(LoadAnnotations):
 
 
 @PIPELINES.register_module()
+class LoadFairMOTAnnotations(LoadAnnotations):
+
+    def __init__(self, with_track=True, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.with_track = with_track
+
+    def _load_track(self, results):
+        """Private function to load label annotations.
+
+        Args:
+            results (dict): Result dict from :obj:`mmtrack.CocoVideoDataset`.
+
+        Returns:
+            dict: The dict contains loaded label annotations.
+        """
+
+        results['gt_instance_ids'] = results['ann_info']['instance_ids'].copy()
+
+        return results
+
+    def __call__(self, results):
+        """Call function.
+
+        For each dict in results, call the call function of `LoadAnnotations`
+        to load annotation.
+
+        Args:
+            results (list[dict]): List of dict that from
+                :obj:`mmtrack.CocoVideoDataset`.
+
+        Returns:
+            list[dict]: List of dict that contains loaded annotations, such as
+            bounding boxes, labels, instance ids, masks and semantic
+            segmentation annotations.
+        """
+        results = super().__call__(results)
+        if self.with_track:
+            results = self._load_track(results)
+        return results
+
+
+@PIPELINES.register_module()
 class LoadDetections(object):
     """Load public detections from MOT benchmark.
 

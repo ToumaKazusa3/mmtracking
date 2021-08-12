@@ -1,6 +1,10 @@
 from .base_reid import BaseReID
+from .conv_reid_head import ConvReIDHead
 from .fc_module import FcModule
 from .gap import GlobalAveragePooling
 from .linear_reid_head import LinearReIDHead
 
-__all__ = ['BaseReID', 'GlobalAveragePooling', 'LinearReIDHead', 'FcModule']
+__all__ = [
+    'BaseReID', 'GlobalAveragePooling', 'LinearReIDHead', 'FcModule',
+    'ConvReIDHead'
+]
