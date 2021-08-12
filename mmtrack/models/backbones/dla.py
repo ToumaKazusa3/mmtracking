@@ -384,9 +384,11 @@ class DLA(nn.Module):
         # fc = self.fc
         if name.endswith('.pth'):
             model_weights = torch.load(data + name)
+            print(f'load dla-34 from local, path={data + name}')
         else:
             model_url = get_model_url(data, name, hash)
             model_weights = model_zoo.load_url(model_url)
+            print('load dla-34 from https')
         num_classes = len(model_weights[list(model_weights.keys())[-1]])
         self.fc = nn.Conv2d(
             self.channels[-1],
@@ -582,8 +584,25 @@ class DLASeg(nn.Module):
         #             fill_fc_weights(fc)
         #     self.__setattr__(head, fc)
 
-    def forward(self, x):
+    def del_unused_layer(self):
+        unused_layer = [
+            'module.detector.backbone.base.level3.project.0.weight',
+            'module.detector.backbone.base.level3.project.1.weight',
+            'module.detector.backbone.base.level3.project.1.bias',
+            'module.detector.backbone.base.level4.project.0.weight',
+            'module.detector.backbone.base.level4.project.1.weight',
+            'module.detector.backbone.base.level4.project.1.bias',
+            'module.detector.backbone.base.fc.weight',
+            'module.detector.backbone.base.fc.bias'
+        ]
+        tmp_dict = dict()
+        for k, v in self:
+            if k not in unused_layer:
+                tmp_dict[k] = v
 
+        return tmp_dict
+
+    def forward(self, x):
         x = self.base(x)
         x = self.dla_up(x)
 

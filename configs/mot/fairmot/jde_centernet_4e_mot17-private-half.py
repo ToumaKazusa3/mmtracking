@@ -111,7 +111,8 @@ data = dict(
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/half-train_cocoformat.json',
+        # ann_file=data_root + 'annotations/half-train_cocoformat.json',
+        ann_file='~/data/MOT17/annotations/half-train_cocoformat.json',
         img_prefix=data_root + 'train',
         ref_img_sampler=None,
         classes=('pedestrian', ),
@@ -131,21 +132,22 @@ data = dict(
         classes=('pedestrian', ),
         pipeline=test_pipeline))
 
-optimizer = dict(type='Adam', lr=0.0002, weight_decay=0.0001)
+optimizer = dict(type='Adam', lr=0.0001, weight_decay=0.0001)
 # learning policy
 lr_config = dict(
     policy='step',
     warmup='linear',
     warmup_iters=100,
     warmup_ratio=1.0 / 100,
-    step=[3])
+    step=[20])
 # runtime settings
-total_epochs = 4
+total_epochs = 30
 evaluation = dict(metric=['bbox', 'track'], interval=1)
 search_metrics = ['MOTA', 'IDF1', 'FN', 'FP', 'IDs', 'MT', 'ML']
 
 checkpoint_config = dict(interval=1)
-load_from = 'ckpts/centernet_resnet18_dcnv2_140e_coco_20210702_155131-c8cd631f.pth'  # noqa: E501
+# load_from = 'ckpts/centernet_resnet18_dcnv2_140e_coco_20210702_155131-c8cd631f.pth'  # noqa: E501
+load_from = None
 
 optimizer_config = dict(grad_clip=None)
 
