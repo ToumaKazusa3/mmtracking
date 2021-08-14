@@ -6,6 +6,7 @@ from mmdet.models import build_detector
 from mmdet.models.utils.gaussian_target import (get_local_maximum,
                                                 get_topk_from_heatmap)
 from torch import nn
+import mmcv
 
 from mmtrack.core import track2result
 from ..builder import MODELS, build_motion, build_reid, build_tracker
@@ -149,6 +150,8 @@ class FairMOT(BaseMultiObjectTracker):
             det_bboxes = result_list[0][0]
             det_labels = result_list[0][1]
             num_classes = self.detector.bbox_head.num_classes
+            # np_det_bboxes = det_bboxes.cpu().numpy()
+            # mmcv.imshow_bboxes(img_meta['filename'], np_det_bboxes[np_det_bboxes[:, -1] > 0.1])
         else:
             raise TypeError('detector must has roi_head or bbox_head.')
 
