@@ -1,12 +1,12 @@
 import warnings
 
+import mmcv
 import torch
 from mmdet.core import bbox2result
 from mmdet.models import build_detector
 from mmdet.models.utils.gaussian_target import (get_local_maximum,
                                                 get_topk_from_heatmap)
 from torch import nn
-import mmcv
 
 from mmtrack.core import track2result
 from ..builder import MODELS, build_motion, build_reid, build_tracker
